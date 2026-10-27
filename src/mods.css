@@ -1,0 +1,56 @@
+.osfs-mods {
+  display: grid;
+  gap: 8px;
+}
+
+.osfs-mods__card {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+}
+
+.osfs-mods__card h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.osfs-mods__tree {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.osfs-mods__kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.osfs-mods__help {
+  min-width: 1.6rem;
+}
+
+.osfs-mods__help-body {
+  max-width: 22rem;
+  margin: 0;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.osfs-mods__dialog {
+  max-width: 28rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: #12181b;
+  color: #e6edef;
+  padding: 12px;
+}
+
+.osfs-mods__dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}

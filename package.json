@@ -1,0 +1,66 @@
+{
+  "name": "@0sfs/mods",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GitHub-hosted mods for 0SFS: manifest schema, dependency loader, sandboxed WebAssembly runner, and the Mods tab.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./ModsPanel": {
+      "source": "./src/ModsPanel.tsx",
+      "default": "./src/ModsPanel.tsx"
+    },
+    "./schema": {
+      "source": "./src/schema.ts",
+      "default": "./src/schema.ts"
+    },
+    "./normalizeModSource": {
+      "source": "./src/normalizeModSource.ts",
+      "default": "./src/normalizeModSource.ts"
+    },
+    "./security": {
+      "source": "./src/security.ts",
+      "default": "./src/security.ts"
+    },
+    "./loader": {
+      "source": "./src/loader.ts",
+      "default": "./src/loader.ts"
+    },
+    "./wasmRunner": {
+      "source": "./src/wasmRunner.ts",
+      "default": "./src/wasmRunner.ts"
+    },
+    "./aboutTree": {
+      "source": "./src/aboutTree.ts",
+      "default": "./src/aboutTree.ts"
+    },
+    "./githubDiscovery": {
+      "source": "./src/githubDiscovery.ts",
+      "default": "./src/githubDiscovery.ts"
+    },
+    "./identity": {
+      "source": "./src/identity.ts",
+      "default": "./src/identity.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "vitest": "4.1.6"
+  }
+}
