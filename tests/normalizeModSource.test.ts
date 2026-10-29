@@ -31,4 +31,15 @@ describe("normalizeModSource", () => {
       bundled: false,
     });
   });
+
+  it("loads an owner/repo from this computer instead of GitHub Pages", () => {
+    expect(normalizeModSource("local:0SFS/DJI-Mini2", { bundledRepos: bundled })).toEqual({
+      canonicalKey: "local:0sfs/dji-mini2@HEAD",
+      manifestUrl: "/dev-mods/dji-mini2/0sfs-mod.json",
+      owner: "0SFS",
+      repo: "DJI-Mini2",
+      ref: "HEAD",
+      bundled: false,
+    });
+  });
 });

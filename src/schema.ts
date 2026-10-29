@@ -34,6 +34,11 @@ export interface ModJsEntry {
   path: string;
 }
 
+/** Optional live-view provider. Its JS module exports createCameraPreview. */
+export interface CameraPreviewModData {
+  apiVersion: 1;
+}
+
 export interface ModEngineContribution {
   id: string;
   label: string;
@@ -104,6 +109,96 @@ export interface ModPayloadContribution {
   tank?: ModExternalTankDefinition;
 }
 
+/** Shared by every quadcopter: how sticks become velocity commands, and the capture grid. */
+export interface QuadcopterModData {
+  kinematic: "drone-pgps";
+  /** Position hold gain (1/s) and stick deadzone. Flight-controller gains are per airframe. */
+  gains: { kPos: number; deadzone: number };
+  gridOverlap: number;
+  physicsHz: 120;
+  gimbalSlewDeg: number;
+  positionHoldMps: number;
+  /** JSBSim properties the rotors' wrench is written to: body axes at the CG, lbf and ft lbf. */
+  properties: { fx: string; fy: string; fz: string; l: string; m: string; n: string; armed: string };
+}
+
+/** Shared by DJI camera drones: the gallery family and mount stabilization. */
+export interface DjiQuadModData {
+  gimbalRollDeg: number;
+  familyId: string;
+  familyLabel: string;
+  familySummary: string;
+}
+
+/** A camera model, declared by its own mod; no flight-controller fields. */
+export interface DroneCameraModData {
+  sensorW: number;
+  sensorH: number;
+  diagonalFovDeg: number;
+  exifModel: string;
+  focalMm: number;
+  focal35mm: number;
+  exposureDen: number;
+  make: string;
+  xmpNamespace: string;
+  software: string;
+  jpegQuality: number;
+}
+
+/** One flight mode's limits, as the manufacturer publishes them. */
+export interface QuadFlightModeData {
+  speedMps: number;
+  tiltMaxDeg: number;
+  yawRateDeg: number;
+  climbMps: number;
+  descentMps: number;
+}
+
+/**
+ * One airframe: rotors, flight controller, flight modes and mount limits;
+ * cameraId selects a camera mod. Mass and inertia are in its JSBSim XML.
+ * Positions are JSBSim structural metres: x aft, y right, z up.
+ */
+export interface QuadVehicleModData {
+  cameraId: string;
+  gimbalMinDeg: number;
+  gimbalMaxDeg: number;
+  /** Simulator manual overrides, bounded by the mount mechanical range. */
+  gimbalRollMinDeg?: number;
+  gimbalRollMaxDeg?: number;
+  gimbalYawMinDeg?: number;
+  gimbalYawMaxDeg?: number;
+  modes: { normal: QuadFlightModeData; sport: QuadFlightModeData };
+  /** One propeller for every rotor. */
+  propeller: {
+    radiusM: number;
+    blades: number;
+    chordM: number;
+    pitchM: number;
+    zeroLiftDeg: number;
+    liftSlope: number;
+    profileDrag: number;
+    /** Propeller and motor bell about the shaft, kg m^2. */
+    inertiaKgM2: number;
+    /** Rotor speed's first-order response, in place of the ESC and motor, s. */
+    timeConstantS: number;
+    maxRpm: number;
+    idleRpm: number;
+  };
+  /** Spin +1 is clockwise seen from above. */
+  rotors: readonly { position: "front-left" | "front-right" | "rear-left" | "rear-right"; hubM: readonly [number, number, number]; spin: 1 | -1 }[];
+  /** Matches the JSBSim XML's CG. */
+  cgM: readonly [number, number, number];
+  control: {
+    kv: number; kvi: number; viLimitH: number; viLimitV: number;
+    shapeGain: number; accelMaxH: number; accelMaxV: number; jerkMax: number;
+    kAtt: number; rateMaxDeg: number;
+    kPsi: number; yawLeadDeg: number;
+    kRate: number; kRi: number; riLimit: number;
+  };
+  aero?: { hubMomentGain?: number; vrsAmplitude?: number; vrsCorrelationS?: number; groundBodyGain?: number };
+}
+
 /** Aircraft families, definitions, flight profiles and how this airframe hangs payload. */
 export interface ModAircraftContribution {
   family: Record<string, unknown>;
@@ -125,6 +220,14 @@ export interface OsfsModManifest {
   /** Paths relative to `${baseUrl}/jsbsim-data/`. */
   jsbsimFiles?: readonly string[];
   aircraft?: ModAircraftContribution;
+  /** Present on `0sfs/quadcopter`. */
+  quadcopter?: QuadcopterModData;
+  /** Present on `0sfs/dji-quadcopter`. */
+  dji?: DjiQuadModData;
+  /** Present on one DJI airframe mod. */
+  quad?: QuadVehicleModData;
+  camera?: DroneCameraModData;
+  cameraPreview?: CameraPreviewModData;
   engine?: ModEngineContribution;
   payload?: ModPayloadContribution;
   wasm?: ModWasmEntry;
@@ -158,6 +261,21 @@ export function assertManifest(value: unknown): OsfsModManifest {
   const execution = inferExecution(manifest as OsfsModManifest);
   if (manifest.execution !== execution) {
     throw new Error(`Mod ${manifest.id} says execution is ${String(manifest.execution)} but the entries make it ${execution}.`);
+  }
+  if (manifest.cameraPreview !== undefined) {
+    if (!manifest.cameraPreview || manifest.cameraPreview.apiVersion !== 1) {
+      throw new Error(`Camera preview mod ${manifest.id} needs cameraPreview.apiVersion 1.`);
+    }
+    if (manifest.kind !== "plugin" || execution !== "js") {
+      throw new Error(`Camera preview mod ${manifest.id} needs kind "plugin" and a JavaScript entry.`);
+    }
+    const entry = manifest.js?.path;
+    if (typeof entry !== "string" || !entry.trim() || entry !== entry.trim()
+      || /^(?:[a-z][a-z0-9+.-]*:|\/)|\\/i.test(entry)
+      || !new URL(entry, "https://mod.invalid/component/").href.startsWith("https://mod.invalid/component/")
+      || !entry.split(/[?#]/)[0] || entry.split(/[?#]/)[0]!.endsWith("/")) {
+      throw new Error(`Camera preview mod ${manifest.id} needs js.path relative to its mod directory.`);
+    }
   }
   if (manifest.kind === "payload") {
     const payload = manifest.payload;

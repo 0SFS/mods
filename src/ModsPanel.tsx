@@ -10,6 +10,9 @@ export interface ModsPanelProps {
   developerUsername: string;
   onDeveloperUsername: (username: string) => void;
   onAdd: (source: string) => void;
+  /** Dev server can serve a checkout at /dev-mods/. Hidden on a published build. */
+  allowLocal?: boolean;
+  onRemove?: (source: string) => void;
   notice: string | null;
   pendingWarning: ModSecurityAssessment | null;
   onConfirmWarning: () => void;
@@ -31,7 +34,7 @@ const BROWSE: readonly { id: ModBrowseKind; label: string }[] = [
   { id: "plugin", label: "Plugins" },
 ];
 
-function ModTree({ parts }: { parts: readonly ModAboutPart[] }) {
+function ModTree({ parts, onRemove }: { parts: readonly ModAboutPart[]; onRemove?: (source: string) => void }) {
   if (parts.length === 0) return <p className="flight-panel__hint">No mods are loaded yet.</p>;
   return (
     <ul className="osfs-mods__tree">
@@ -40,7 +43,8 @@ function ModTree({ parts }: { parts: readonly ModAboutPart[] }) {
           <span>{part.name}</span>
           {part.version ? <span className="flight-panel__hint"> {part.version}</span> : null}
           {part.listedAbove ? <span className="flight-panel__hint"> same copy as above</span> : null}
-          {part.parts && part.parts.length > 0 ? <ModTree parts={part.parts} /> : null}
+          {part.removable && part.source && onRemove ? <button type="button" onClick={() => onRemove(part.source!)}>Remove</button> : null}
+          {part.parts && part.parts.length > 0 ? <ModTree parts={part.parts} onRemove={onRemove} /> : null}
         </li>
       ))}
     </ul>
@@ -50,21 +54,34 @@ function ModTree({ parts }: { parts: readonly ModAboutPart[] }) {
 /** Installed mods, adding a GitHub URL, topic browse, and a share link. Confirmation stays in this tab. */
 export function ModsPanel(props: ModsPanelProps) {
   const [source, setSource] = useState("");
+  const [place, setPlace] = useState<"github" | "local">("github");
   const [username, setUsername] = useState(props.developerUsername);
+  const local = props.allowLocal === true && place === "local";
   return (
     <div className="flight-panel__content osfs-mods">
       <section className="osfs-mods__card">
         <h3>Installed mods</h3>
-        <ModTree parts={props.installed} />
+        <ModTree parts={props.installed} onRemove={props.onRemove} />
         <p className="flight-panel__hint">Engines and payload items are nested under the aircraft that carries them. A shared weapon is loaded once.</p>
       </section>
       <section className="osfs-mods__card">
         <h3>Add mod</h3>
-        <form onSubmit={(event) => { event.preventDefault(); if (source.trim()) props.onAdd(source.trim()); }}>
+        <form onSubmit={(event) => {
+          event.preventDefault();
+          const value = source.trim().replace(/^local:/, "");
+          if (value) props.onAdd(local ? `local:${value}` : value);
+        }}>
+          {props.allowLocal ? (
+            <div className="osfs-mods__kinds" role="group" aria-label="Where to load the mod">
+              <button type="button" aria-pressed={place === "github"} onClick={() => setPlace("github")}>GitHub</button>
+              <button type="button" aria-pressed={place === "local"} onClick={() => setPlace("local")}>This computer</button>
+            </div>
+          ) : null}
           <label className="flight-panel__field">
-            <span>GitHub URL or owner/repo</span>
-            <input value={source} onChange={(event) => setSource(event.target.value)} placeholder="0SFS/AIM-120" aria-label="Mod GitHub URL or owner/repo" />
+            <span>{local ? "owner/repo on this computer" : "GitHub URL or owner/repo"}</span>
+            <input value={source} onChange={(event) => setSource(event.target.value)} placeholder="0SFS/DJI-Mini2" aria-label={local ? "Mod owner and repo on this computer" : "Mod GitHub URL or owner/repo"} />
           </label>
+          <p className="flight-panel__hint">{local ? "Loads that checkout from this dev server, including its dependencies." : "Loads the published GitHub Pages copy."}</p>
           <button type="submit">Add mod</button>
           {props.notice ? <p className="flight-panel__hint is-error">{props.notice}</p> : null}
           <button type="button" className="osfs-mods__help" popoverTarget="osfs-mods-safety" aria-label="How mod safety works">?</button>

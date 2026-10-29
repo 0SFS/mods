@@ -10,6 +10,9 @@ export interface ModAboutPart {
   history?: readonly { hash: string; at: string; subject: string }[];
   /** A shared engine or payload already drawn in full higher in the tree. */
   listedAbove?: boolean;
+  /** Manifest URL. Present when this row can be removed. */
+  source?: string;
+  removable?: boolean;
   parts?: ModAboutPart[];
 }
 
@@ -27,7 +30,7 @@ function partFrom(record: LoadedModRecord, seen: Set<string>): ModAboutPart {
     };
   }
   seen.add(record.source.canonicalKey);
-  const children = record.dependencies.filter(dependency => dependency.manifest.kind === "engine" || dependency.manifest.kind === "payload" || dependency.manifest.kind === "aircraft");
+  const children = record.dependencies.filter(dependency => dependency.manifest.kind === "engine" || dependency.manifest.kind === "payload" || dependency.manifest.kind === "aircraft" || dependency.manifest.kind === "plugin");
   return {
     name: record.manifest.name,
     from: "mod",
@@ -35,6 +38,8 @@ function partFrom(record: LoadedModRecord, seen: Set<string>): ModAboutPart {
     commit,
     repository: record.manifest.provenance.repository,
     history: commit ? [{ hash: commit, at: "", subject: record.manifest.summary }] : undefined,
+    source: record.source?.manifestUrl,
+    removable: record.source?.bundled === false,
     parts: children.map(dependency => partFrom(dependency, seen)),
   };
 }

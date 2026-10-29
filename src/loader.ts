@@ -32,6 +32,13 @@ export class ModDependencyError extends Error {
   }
 }
 
+/** A mod loaded from this computer keeps its owner/repo dependencies on this computer. */
+function localDependency(parentKey: string, dependency: string): string {
+  const trimmed = dependency.trim();
+  if (!parentKey.startsWith("local:") || trimmed.startsWith("local:")) return dependency;
+  return `local:${trimmed}`;
+}
+
 function baseUrlOf(manifestUrl: string): string {
   const slash = manifestUrl.lastIndexOf("/");
   return slash >= 0 ? manifestUrl.slice(0, slash + 1) : manifestUrl;
@@ -109,7 +116,7 @@ export class ModRegistry {
     const nextKeys = [...keys, normalized.canonicalKey];
     const dependencies: LoadedModRecord[] = [];
     for (const dependency of checked.dependencies ?? []) {
-      dependencies.push(await this.load(dependencySource(dependency), nextStack, nextKeys));
+      dependencies.push(await this.load(localDependency(normalized.canonicalKey, dependencySource(dependency)), nextStack, nextKeys));
     }
     const record: LoadedModRecord = {
       manifest: checked,

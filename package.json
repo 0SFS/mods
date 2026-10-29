@@ -18,6 +18,10 @@
       "source": "./src/schema.ts",
       "default": "./src/schema.ts"
     },
+    "./cameraPreview": {
+      "source": "./src/cameraPreview.ts",
+      "default": "./src/cameraPreview.ts"
+    },
     "./normalizeModSource": {
       "source": "./src/normalizeModSource.ts",
       "default": "./src/normalizeModSource.ts"

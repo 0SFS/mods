@@ -58,6 +58,24 @@ describe("mod dependency loader", () => {
     expect(tree[1]?.parts?.every(part => part.listedAbove)).toBe(true);
   });
 
+  it("keeps dependencies of a local mod on this computer", async () => {
+    const quad = manifest("0sfs/quadcopter", [], "plugin");
+    const dji = manifest("0sfs/dji-quadcopter", ["0SFS/Quadcopter"], "plugin");
+    const mini = manifest("0sfs/dji-mini2", ["0SFS/DJI-Quadcopter"]);
+    const documents = {
+      "/dev-mods/dji-mini2/0sfs-mod.json": mini,
+      "/dev-mods/dji-quadcopter/0sfs-mod.json": dji,
+      "/dev-mods/quadcopter/0sfs-mod.json": quad,
+    };
+    const { fetchImpl, counts } = fetchCounting(documents);
+    const registry = new ModRegistry({ fetch: fetchImpl, entry: "user-add" });
+    const loaded = await registry.load("local:0SFS/DJI-Mini2");
+    expect(loaded.baseUrl).toBe("/dev-mods/dji-mini2/");
+    expect(loaded.dependencies[0]?.baseUrl).toBe("/dev-mods/dji-quadcopter/");
+    expect(loaded.dependencies[0]?.dependencies[0]?.baseUrl).toBe("/dev-mods/quadcopter/");
+    expect(counts.has("https://0sfs.github.io/DJI-Quadcopter/0sfs-mod.json")).toBe(false);
+  });
+
   it("rejects a cycle with the dependency path", async () => {
     const documents = {
       "https://0sfs.github.io/a/0sfs-mod.json": manifest("0sfs/a", ["0SFS/b"]),

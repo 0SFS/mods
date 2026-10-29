@@ -60,6 +60,17 @@ function fromGithubPath(owner: string, repoName: string, rest: string, options: 
 export function normalizeModSource(source: string, options: NormalizeModSourceOptions = {}): NormalizedModSource {
   const trimmed = source.trim();
   if (!trimmed) throw new Error("A mod source is empty.");
+  if (trimmed.startsWith("local:")) {
+    const inner = normalizeModSource(trimmed.slice("local:".length), options);
+    return {
+      canonicalKey: `local:${inner.owner.toLowerCase()}/${inner.repo.toLowerCase()}@${inner.ref}`,
+      manifestUrl: `/dev-mods/${inner.repo.toLowerCase()}/0sfs-mod.json`,
+      owner: inner.owner,
+      repo: inner.repo,
+      ref: inner.ref,
+      bundled: false,
+    };
+  }
   const shorthand = SHORTHAND.exec(trimmed);
   if (shorthand) {
     const owner = shorthand[1]!;
