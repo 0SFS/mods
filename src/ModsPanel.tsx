@@ -30,8 +30,10 @@ const BROWSE: readonly { id: ModBrowseKind; label: string }[] = [
   { id: "all", label: "All" },
   { id: "aircraft", label: "Aircraft" },
   { id: "engine", label: "Engines" },
+  { id: "component", label: "Components" },
   { id: "payload", label: "Payloads" },
   { id: "plugin", label: "Plugins" },
+  { id: "modpack", label: "Modpacks" },
 ];
 
 function ModTree({ parts, onRemove }: { parts: readonly ModAboutPart[]; onRemove?: (source: string) => void }) {
@@ -62,7 +64,7 @@ export function ModsPanel(props: ModsPanelProps) {
       <section className="osfs-mods__card">
         <h3>Installed mods</h3>
         <ModTree parts={props.installed} onRemove={props.onRemove} />
-        <p className="flight-panel__hint">Engines and payload items are nested under the aircraft that carries them. A shared weapon is loaded once.</p>
+        <p className="flight-panel__hint">The default modpack brings in what every flight starts with. Each mod sits under the mod that needs it, and a shared one is loaded once.</p>
       </section>
       <section className="osfs-mods__card">
         <h3>Add mod</h3>

@@ -17,6 +17,11 @@ export interface ModLoaderOptions extends NormalizeModSourceOptions {
   /** Manifests already in the build. Keyed by canonical URL. No network. */
   bundled?: ReadonlyMap<string, OsfsModManifest>;
   /**
+   * Where the build serves a bundled mod's files, with a trailing slash. The host
+   * links each bundled mod's `public/` into its own root. Absent: beside the manifest.
+   */
+  bundledBaseUrl?: string;
+  /**
    * `startup-url` is `?mods=`. A third-party JS mod is refused there.
    * `user-add` is the Mods tab, which may confirm it.
    */
@@ -121,7 +126,9 @@ export class ModRegistry {
     const record: LoadedModRecord = {
       manifest: checked,
       source: normalized,
-      baseUrl: baseUrlOf(normalized.manifestUrl),
+      baseUrl: normalized.bundled && this.options.bundledBaseUrl !== undefined
+        ? this.options.bundledBaseUrl
+        : baseUrlOf(normalized.manifestUrl),
       security,
       dependencies,
     };

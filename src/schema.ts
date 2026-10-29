@@ -1,5 +1,13 @@
-/** A mod is an aircraft, an engine, one payload item, or a plugin. */
-export type ModKind = "aircraft" | "engine" | "payload" | "plugin";
+/**
+ * What a mod contributes. An aircraft, an engine, a component shared by other mods
+ * (a propeller, a gimbal, a camera, a flight model), one payload item, or a plugin.
+ * A modpack contributes nothing itself: it lists the mods to install together.
+ */
+export const MOD_KINDS = ["aircraft", "engine", "component", "payload", "plugin", "modpack"] as const;
+export type ModKind = (typeof MOD_KINDS)[number];
+
+/** The keys that carry a mod's own content. A modpack has none of them. */
+const CONTENT_KEYS = ["aircraft", "engine", "payload", "jsbsimFiles", "quadcopter", "dji", "quad", "camera", "cameraPreview", "wasm", "js"] as const;
 
 /** Declarative mods run no code. Rust/WASM is the sandboxed path. JS is the last resort. */
 export type ModExecutionMode = "declarative" | "wasm" | "js";
@@ -250,7 +258,7 @@ export function assertManifest(value: unknown): OsfsModManifest {
   const manifest = value as Partial<OsfsModManifest>;
   if (manifest.schemaVersion !== 1) throw new Error("Unsupported mod schemaVersion.");
   if (typeof manifest.id !== "string" || !manifest.id) throw new Error("A mod manifest needs an id.");
-  if (manifest.kind !== "aircraft" && manifest.kind !== "engine" && manifest.kind !== "payload" && manifest.kind !== "plugin") {
+  if (!(MOD_KINDS as readonly unknown[]).includes(manifest.kind)) {
     throw new Error(`Unsupported mod kind: ${String(manifest.kind)}.`);
   }
   if (typeof manifest.name !== "string" || typeof manifest.summary !== "string") throw new Error("A mod manifest needs a name and summary.");
@@ -276,6 +284,11 @@ export function assertManifest(value: unknown): OsfsModManifest {
       || !entry.split(/[?#]/)[0] || entry.split(/[?#]/)[0]!.endsWith("/")) {
       throw new Error(`Camera preview mod ${manifest.id} needs js.path relative to its mod directory.`);
     }
+  }
+  if (manifest.kind === "modpack") {
+    if (!manifest.dependencies?.length) throw new Error(`Modpack ${manifest.id} lists no mods in dependencies.`);
+    const content = CONTENT_KEYS.find(key => manifest[key] !== undefined);
+    if (content) throw new Error(`Modpack ${manifest.id} only lists mods; it cannot carry ${content}.`);
   }
   if (manifest.kind === "payload") {
     const payload = manifest.payload;

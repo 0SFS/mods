@@ -14,8 +14,10 @@ const TOPIC: Record<ModBrowseKind, string> = {
   all: "topic:0sfs-mod",
   aircraft: "topic:0sfs-mod topic:0sfs-aircraft",
   engine: "topic:0sfs-mod topic:0sfs-engine",
+  component: "topic:0sfs-mod topic:0sfs-component",
   payload: "topic:0sfs-mod topic:0sfs-payload",
   plugin: "topic:0sfs-mod topic:0sfs-plugin",
+  modpack: "topic:0sfs-mod topic:0sfs-modpack",
 };
 
 const TEN_MINUTES_MS = 10 * 60 * 1000;

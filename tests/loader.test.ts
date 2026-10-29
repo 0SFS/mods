@@ -59,8 +59,8 @@ describe("mod dependency loader", () => {
   });
 
   it("keeps dependencies of a local mod on this computer", async () => {
-    const quad = manifest("0sfs/quadcopter", [], "plugin");
-    const dji = manifest("0sfs/dji-quadcopter", ["0SFS/Quadcopter"], "plugin");
+    const quad = manifest("0sfs/quadcopter", [], "component");
+    const dji = manifest("0sfs/dji-quadcopter", ["0SFS/Quadcopter"], "component");
     const mini = manifest("0sfs/dji-mini2", ["0SFS/DJI-Quadcopter"]);
     const documents = {
       "/dev-mods/dji-mini2/0sfs-mod.json": mini,
