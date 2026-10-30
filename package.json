@@ -50,7 +50,11 @@
       "source": "./src/identity.ts",
       "default": "./src/identity.ts"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./ownedRegistry": {
+      "source": "./src/ownedRegistry.ts",
+      "default": "./src/ownedRegistry.ts"
+    }
   },
   "peerDependencies": {
     "react": "19.2.6",

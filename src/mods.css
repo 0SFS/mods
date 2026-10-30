@@ -28,7 +28,111 @@
 .osfs-mods__kinds {
   display: flex;
   flex-wrap: wrap;
+  gap: 2px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+}
+
+.osfs-mods__kinds button {
+  border: 0;
+  border-radius: 6px;
+  min-height: 22px;
+  padding: 1px 5px;
+  background: transparent;
+  color: var(--flight-panel-text, #e6edef);
+  font: inherit;
+  cursor: pointer;
+}
+
+.osfs-mods__kinds button[aria-pressed="true"] {
+  background: rgba(92, 184, 224, 0.22);
+  box-shadow: inset 0 0 0 1px #5cb8e0;
+}
+
+.osfs-mods__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.osfs-mods__form .flight-panel__field {
+  width: 100%;
+  min-width: 0;
+}
+
+.osfs-mods__form .flight-panel__field input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 5px 6px;
+  border: 1px solid var(--flight-panel-line, #ffffff24);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--flight-panel-text, #e6edef);
+  font: inherit;
+}
+
+.osfs-mods__form button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.osfs-mods input {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.osfs-mods__results {
+  display: grid;
   gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.osfs-mods__result {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 6px;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
+  border: 1px solid var(--flight-panel-line, #ffffff24);
+  border-radius: 6px;
+  background: rgba(13, 17, 20, 0.8);
+  color: var(--flight-panel-text, #e6edef);
+  font: inherit;
+  cursor: pointer;
+}
+
+.osfs-mods__result:hover {
+  border-color: var(--flight-panel-muted, #a5b3b9);
+}
+
+.osfs-mods :is(button, input):focus-visible {
+  outline: 2px solid var(--flight-panel-accent, #5cb8e0);
+  outline-offset: 2px;
+}
+
+.osfs-mods__description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.osfs-mods__result-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
 }
 
 .osfs-mods__help {

@@ -7,7 +7,7 @@ export const MOD_KINDS = ["aircraft", "engine", "component", "payload", "plugin"
 export type ModKind = (typeof MOD_KINDS)[number];
 
 /** The keys that carry a mod's own content. A modpack has none of them. */
-const CONTENT_KEYS = ["aircraft", "engine", "payload", "jsbsimFiles", "quadcopter", "dji", "quad", "camera", "cameraPreview", "wasm", "js"] as const;
+const CONTENT_KEYS = ["aircraft", "engine", "payload", "jsbsimFiles", "quadcopter", "dji", "quad", "camera", "cameraPreview", "audioRenderer", "wasm", "js"] as const;
 
 /** Declarative mods run no code. Rust/WASM is the sandboxed path. JS is the last resort. */
 export type ModExecutionMode = "declarative" | "wasm" | "js";
@@ -42,26 +42,39 @@ export interface ModJsEntry {
   path: string;
 }
 
+/** Numeric source generator loaded inside the sound worklet, never as a flight JS module. */
+export interface ModAudioRendererContribution {
+  apiVersion: 1;
+  abi: "osfs-engine-voice-v1";
+  rendererId: string;
+  engineClasses: readonly string[];
+  telemetrySchemaIds: readonly string[];
+  wasm: { path: string; sha256: string };
+}
+
 /** Optional live-view provider. Its JS module exports createCameraPreview. */
 export interface CameraPreviewModData {
   apiVersion: 1;
 }
 
-export interface ModEngineContribution {
+export interface ElectricPropellerData {
+  radiusM: number;
+  blades: number;
+  chordM: number;
+  pitchM: number;
+  zeroLiftDeg: number;
+  liftSlope: number;
+  profileDrag: number;
+  inertiaKgM2: number;
+  timeConstantS: number;
+  maxRpm: number;
+  idleRpm: number;
+}
+
+interface ModEngineBase {
   id: string;
   label: string;
   summary: string;
-  type: "piston" | "turbine";
-  jsbsimEngineFiles: readonly string[];
-  rotorBlades: {
-    outer: number;
-    inner: number | null;
-    outerEstimated: boolean;
-    innerEstimated: boolean;
-  };
-  startSpeed: { property: string; runningAt: number };
-  maxEngineRpm?: number;
-  gauges: { primary: string; secondary: string | null; label: string };
   engineAssets?: {
     full: { path: string; triangles: number };
     installed: { path: string; triangles: number };
@@ -85,6 +98,22 @@ export interface ModEngineContribution {
     parameters: unknown;
   };
 }
+
+export interface ModNativeEngineContribution extends ModEngineBase {
+  type: "piston" | "turbine";
+  jsbsimEngineFiles: readonly string[];
+  rotorBlades: { outer: number; inner: number | null; outerEstimated: boolean; innerEstimated: boolean };
+  startSpeed: { property: string; runningAt: number };
+  maxEngineRpm?: number;
+  gauges: { primary: string; secondary: string | null; label: string };
+}
+
+export interface ModElectricEngineContribution extends ModEngineBase {
+  type: "electric";
+  electric: { propeller: ElectricPropellerData };
+}
+
+export type ModEngineContribution = ModNativeEngineContribution | ModElectricEngineContribution;
 
 export interface ModStoreDefinition {
   id: number;
@@ -130,12 +159,9 @@ export interface QuadcopterModData {
   properties: { fx: string; fy: string; fz: string; l: string; m: string; n: string; armed: string };
 }
 
-/** Shared by DJI camera drones: the gallery family and mount stabilization. */
+/** Shared by DJI camera drones: mount stabilization. */
 export interface DjiQuadModData {
   gimbalRollDeg: number;
-  familyId: string;
-  familyLabel: string;
-  familySummary: string;
 }
 
 /** A camera model, declared by its own mod; no flight-controller fields. */
@@ -177,22 +203,10 @@ export interface QuadVehicleModData {
   gimbalYawMinDeg?: number;
   gimbalYawMaxDeg?: number;
   modes: { normal: QuadFlightModeData; sport: QuadFlightModeData };
-  /** One propeller for every rotor. */
-  propeller: {
-    radiusM: number;
-    blades: number;
-    chordM: number;
-    pitchM: number;
-    zeroLiftDeg: number;
-    liftSlope: number;
-    profileDrag: number;
-    /** Propeller and motor bell about the shaft, kg m^2. */
-    inertiaKgM2: number;
-    /** Rotor speed's first-order response, in place of the ESC and motor, s. */
-    timeConstantS: number;
-    maxRpm: number;
-    idleRpm: number;
-  };
+  /** Engine mod ID owning this vehicle's motor and propeller data. */
+  propulsionId?: string;
+  /** Legacy inline data. New airframes select an electric propulsion mod instead. */
+  propeller?: ElectricPropellerData;
   /** Spin +1 is clockwise seen from above. */
   rotors: readonly { position: "front-left" | "front-right" | "rear-left" | "rear-right"; hubM: readonly [number, number, number]; spin: 1 | -1 }[];
   /** Matches the JSBSim XML's CG. */
@@ -212,7 +226,7 @@ export interface ModAircraftContribution {
   family: Record<string, unknown>;
   definitions: readonly Record<string, unknown>[];
   fdmProfiles: Readonly<Record<string, Record<string, unknown>>>;
-  audio?: { engineDefinitionId: string };
+  audio?: { engineDefinitionId: string; sourceKind?: "rotor" };
   payloadInstallation?: Record<string, unknown>;
 }
 
@@ -236,6 +250,7 @@ export interface OsfsModManifest {
   quad?: QuadVehicleModData;
   camera?: DroneCameraModData;
   cameraPreview?: CameraPreviewModData;
+  audioRenderer?: ModAudioRendererContribution;
   engine?: ModEngineContribution;
   payload?: ModPayloadContribution;
   wasm?: ModWasmEntry;
@@ -246,10 +261,10 @@ export function dependencySource(dependency: string | ModDependencySpec): string
   return typeof dependency === "string" ? dependency : dependency.source;
 }
 
-/** Declarative when neither entry is set, WASM when only wasm is set, JS when js is set. */
-export function inferExecution(manifest: Pick<OsfsModManifest, "wasm" | "js">): ModExecutionMode {
+/** Source generators are sandboxed WASM; JavaScript entries always select JS execution. */
+export function inferExecution(manifest: Pick<OsfsModManifest, "wasm" | "js" | "audioRenderer">): ModExecutionMode {
   if (manifest.js) return "js";
-  if (manifest.wasm) return "wasm";
+  if (manifest.wasm || manifest.audioRenderer) return "wasm";
   return "declarative";
 }
 
@@ -269,6 +284,40 @@ export function assertManifest(value: unknown): OsfsModManifest {
   const execution = inferExecution(manifest as OsfsModManifest);
   if (manifest.execution !== execution) {
     throw new Error(`Mod ${manifest.id} says execution is ${String(manifest.execution)} but the entries make it ${execution}.`);
+  }
+  if (manifest.audioRenderer !== undefined) {
+    const renderer = manifest.audioRenderer;
+    if (!renderer || renderer.apiVersion !== 1 || renderer.abi !== "osfs-engine-voice-v1") {
+      throw new Error(`Audio renderer mod ${manifest.id} needs apiVersion 1 and ABI osfs-engine-voice-v1.`);
+    }
+    if (manifest.kind !== "component" || manifest.js || manifest.wasm) {
+      throw new Error(`Audio renderer mod ${manifest.id} must be a component with only an audioRenderer WASM entry.`);
+    }
+    if (typeof renderer.rendererId !== "string" || !renderer.rendererId.trim()
+      || !Array.isArray(renderer.engineClasses) || !renderer.engineClasses.length
+      || !renderer.engineClasses.every(value => typeof value === "string" && value.trim())
+      || !Array.isArray(renderer.telemetrySchemaIds) || !renderer.telemetrySchemaIds.length
+      || !renderer.telemetrySchemaIds.every(value => typeof value === "string" && value.trim())) {
+      throw new Error(`Audio renderer mod ${manifest.id} needs a rendererId, engineClasses and telemetrySchemaIds.`);
+    }
+    const entry = renderer.wasm?.path;
+    if (typeof entry !== "string" || !entry.trim() || entry !== entry.trim()
+      || /^(?:[a-z][a-z0-9+.-]*:|\/)|\\|[?#]/i.test(entry)
+      || !new URL(entry, "https://mod.invalid/component/").href.startsWith("https://mod.invalid/component/")
+      || !entry.endsWith(".wasm")) {
+      throw new Error(`Audio renderer mod ${manifest.id} needs a relative wasm.path ending in .wasm.`);
+    }
+    if (typeof renderer.wasm.sha256 !== "string" || !/^[a-f0-9]{64}$/i.test(renderer.wasm.sha256)) {
+      throw new Error(`Audio renderer mod ${manifest.id} needs a SHA-256 digest for its WASM source generator.`);
+    }
+  }
+  if (manifest.engine?.type === "electric") {
+    const propeller = manifest.engine.electric?.propeller;
+    if (!propeller || !["radiusM", "blades", "chordM", "pitchM", "liftSlope", "profileDrag", "inertiaKgM2", "timeConstantS", "maxRpm", "idleRpm"]
+      .every(key => Number.isFinite(propeller[key as keyof ElectricPropellerData]) && propeller[key as keyof ElectricPropellerData] > 0)
+      || !Number.isFinite(propeller.zeroLiftDeg) || !Number.isInteger(propeller.blades) || propeller.idleRpm >= propeller.maxRpm) {
+      throw new Error(`Electric engine mod ${manifest.id} needs a valid physical propeller specification.`);
+    }
   }
   if (manifest.cameraPreview !== undefined) {
     if (!manifest.cameraPreview || manifest.cameraPreview.apiVersion !== 1) {

@@ -3,6 +3,7 @@ import type { ModBrowseKind } from "./githubDiscovery";
 import type { GithubModRepository } from "./githubDiscovery";
 import type { ModAboutPart } from "./aboutTree";
 import type { ModSecurityAssessment } from "./security";
+import { normalizeModSource } from "./normalizeModSource";
 import "./mods.css";
 
 export interface ModsPanelProps {
@@ -17,10 +18,16 @@ export interface ModsPanelProps {
   pendingWarning: ModSecurityAssessment | null;
   onConfirmWarning: () => void;
   onDismissWarning: () => void;
+  source: string;
+  onSource: (source: string) => void;
+  place: "github" | "local";
+  onPlace: (place: "github" | "local") => void;
   browseKind: ModBrowseKind;
   onBrowseKind: (kind: ModBrowseKind) => void;
   browseResults: readonly GithubModRepository[];
   browseError: string | null;
+  browseStatus: "idle" | "loading" | "waiting" | "ready" | "error";
+  browseRetryAt: number | null;
   onBrowse: () => void;
   onInstallResult: (fullName: string) => void;
   shareUrl: string;
@@ -53,42 +60,39 @@ function ModTree({ parts, onRemove }: { parts: readonly ModAboutPart[]; onRemove
   );
 }
 
-/** Installed mods, adding a GitHub URL, topic browse, and a share link. Confirmation stays in this tab. */
+/** Find and add mods in one place. Confirmation stays in this tab. */
 export function ModsPanel(props: ModsPanelProps) {
-  const [source, setSource] = useState("");
-  const [place, setPlace] = useState<"github" | "local">("github");
   const [username, setUsername] = useState(props.developerUsername);
-  const local = props.allowLocal === true && place === "local";
+  const local = props.allowLocal === true && props.place === "local";
+  const value = props.source.trim().replace(/^local:/, "");
+  let canAdd = false;
+  try { normalizeModSource(value); canAdd = true; } catch { /* Search terms aren't mod sources. */ }
   return (
     <div className="flight-panel__content osfs-mods">
-      <section className="osfs-mods__card">
-        <h3>Installed mods</h3>
-        <ModTree parts={props.installed} onRemove={props.onRemove} />
-        <p className="flight-panel__hint">The default modpack brings in what every flight starts with. Each mod sits under the mod that needs it, and a shared one is loaded once.</p>
-      </section>
-      <section className="osfs-mods__card">
+      <section className="osfs-mods__card osfs-mods__add">
         <h3>Add mod</h3>
-        <form onSubmit={(event) => {
+        <form className="osfs-mods__form" onSubmit={(event) => {
           event.preventDefault();
-          const value = source.trim().replace(/^local:/, "");
-          if (value) props.onAdd(local ? `local:${value}` : value);
+          if (canAdd) props.onAdd(local ? `local:${value}` : value);
         }}>
           {props.allowLocal ? (
             <div className="osfs-mods__kinds" role="group" aria-label="Where to load the mod">
-              <button type="button" aria-pressed={place === "github"} onClick={() => setPlace("github")}>GitHub</button>
-              <button type="button" aria-pressed={place === "local"} onClick={() => setPlace("local")}>This computer</button>
+              <button type="button" aria-pressed={!local} onClick={() => props.onPlace("github")}>GitHub</button>
+              <button type="button" aria-pressed={local} onClick={() => props.onPlace("local")}>This computer</button>
             </div>
           ) : null}
           <label className="flight-panel__field">
-            <span>{local ? "owner/repo on this computer" : "GitHub URL or owner/repo"}</span>
-            <input value={source} onChange={(event) => setSource(event.target.value)} placeholder="0SFS/DJI-Mini2" aria-label={local ? "Mod owner and repo on this computer" : "Mod GitHub URL or owner/repo"} />
+            <span>{local ? "Repository on this computer" : "Search mods or enter a GitHub URL"}</span>
+            <input value={props.source} onChange={(event) => props.onSource(event.target.value)} placeholder="{org}/{repo}" aria-label={local ? "Mod owner and repo on this computer" : "Search mods or enter a GitHub URL or owner/repo"} autoComplete="off" spellCheck={false} aria-controls={local ? undefined : "osfs-mods-results"} />
           </label>
-          <p className="flight-panel__hint">{local ? "Loads that checkout from this dev server, including its dependencies." : "Loads the published GitHub Pages copy."}</p>
-          <button type="submit">Add mod</button>
+          {local ? <p className="flight-panel__hint">Loads that checkout from this dev server, including its dependencies.</p> : null}
+          <button className="flight-panel__command" type="submit" disabled={!canAdd}>Add mod</button>
           {props.notice ? <p className="flight-panel__hint is-error">{props.notice}</p> : null}
           <button type="button" className="osfs-mods__help" popoverTarget="osfs-mods-safety" aria-label="How mod safety works">?</button>
           <div id="osfs-mods-safety" popover="auto" className="osfs-mods__help-body">
+            <p>Search public repositories tagged 0sfs-mod, or enter a GitHub URL or owner/repo to add a mod directly. Added mods load their published copy.</p>
             <p>Official 0SFS and foss-earth mods load directly. A repository you own loads directly once your GitHub username is set. Any other owner asks before it is enabled. Declarative mods are data only. Rust/WASM mods stay in a sandbox. JavaScript mods are unsandboxed and never start from a shared link.</p>
+            <a href="https://github.com/0SFS/docs/blob/main/modding.md" target="_blank" rel="noreferrer">Modding guide</a>
           </div>
         </form>
         {props.pendingWarning ? (
@@ -100,24 +104,33 @@ export function ModsPanel(props: ModsPanelProps) {
             <button type="button" onClick={props.onDismissWarning}>Cancel</button>
           </dialog>
         ) : null}
-      </section>
-      <section className="osfs-mods__card">
-        <h3>Browse GitHub mods</h3>
+        {!local ? <>
         <div className="osfs-mods__kinds" role="group" aria-label="Mod kind">
           {BROWSE.map(kind => (
             <button type="button" key={kind.id} aria-pressed={props.browseKind === kind.id} onClick={() => props.onBrowseKind(kind.id)}>{kind.label}</button>
           ))}
         </div>
-        <button type="button" onClick={props.onBrowse}>Search topic:0sfs-mod</button>
-        {props.browseError ? <p className="flight-panel__hint is-error">{props.browseError}</p> : null}
-        <ul className="osfs-mods__tree">
+        <div role="status" aria-live="polite" className="flight-panel__hint">
+          {props.browseStatus === "loading" ? "Searching GitHub…" : props.browseStatus === "waiting" ? `GitHub search limit reached. Search resumes${props.browseRetryAt ? ` at ${new Date(props.browseRetryAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : " shortly"}.` : props.browseStatus === "ready" && props.browseResults.length === 0 ? "No matching mods. Try another name or add a repository directly." : props.browseStatus === "idle" && props.source.trim().length === 1 ? "Type at least 2 characters to search." : null}
+        </div>
+        {props.browseError ? <div className="flight-panel__hint is-error" role="alert">{props.browseError} <button type="button" onClick={props.onBrowse}>Retry</button></div> : null}
+        <ul id="osfs-mods-results" className="osfs-mods__results" aria-label="Matching mods" aria-busy={props.browseStatus === "loading" || props.browseStatus === "waiting"} role="list">
           {props.browseResults.map(repository => (
             <li key={repository.fullName}>
-              <button type="button" onClick={() => props.onInstallResult(repository.fullName)}>{repository.fullName}</button>
-              <span className="flight-panel__hint"> {repository.stars} stars. {repository.description}</span>
+              <button className="osfs-mods__result" type="button" aria-label={`Add ${repository.fullName}`} onClick={() => props.onInstallResult(repository.fullName)}>
+                <strong>{repository.fullName}</strong>
+                {repository.description ? <span className="flight-panel__hint osfs-mods__description">{repository.description}</span> : null}
+                <span className="osfs-mods__result-footer"><span className="flight-panel__hint">{repository.stars} stars</span><span>Add</span></span>
+              </button>
             </li>
           ))}
         </ul>
+        </> : null}
+      </section>
+      <section className="osfs-mods__card">
+        <h3>Installed mods</h3>
+        <ModTree parts={props.installed} onRemove={props.onRemove} />
+        <p className="flight-panel__hint">The default modpack brings in what every flight starts with. Each mod sits under the mod that needs it, and a shared one is loaded once.</p>
       </section>
       <section className="osfs-mods__card">
         <h3>Share modded flight</h3>

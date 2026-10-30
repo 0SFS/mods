@@ -1,7 +1,7 @@
 export { assertManifest, dependencySource, inferExecution } from "./schema";
 export type {
-  ModAircraftContribution, ModDependencySpec, ModEngineContribution, ModExecutionMode, ModExternalTankDefinition,
-  ModJsEntry, ModKind, ModPayloadContribution, ModProvenance, ModStoreDefinition, ModWasmEntry, OsfsModManifest,
+  ModAudioRendererContribution, ModAircraftContribution, ModDependencySpec, ModEngineContribution, ModExecutionMode, ModExternalTankDefinition,
+  ModElectricEngineContribution, ModNativeEngineContribution, ElectricPropellerData, ModJsEntry, ModKind, ModPayloadContribution, ModProvenance, ModStoreDefinition, ModWasmEntry, OsfsModManifest,
 } from "./schema";
 export { normalizeModSource } from "./normalizeModSource";
 export type { NormalizedModSource, NormalizeModSourceOptions } from "./normalizeModSource";
@@ -14,5 +14,5 @@ export { WASM_AUDIO_MAX_MEMORY_PAGES, WASM_MAX_MEMORY_PAGES, assertWasmSandbox, 
 export type { WasmModRunner, WasmModRunnerOptions } from "./wasmRunner";
 export { modAboutParts } from "./aboutTree";
 export type { ModAboutPart } from "./aboutTree";
-export { browseGithubMods } from "./githubDiscovery";
-export type { GithubModRepository, ModBrowseKind } from "./githubDiscovery";
+export { browseGithubMods, searchGithubMods } from "./githubDiscovery";
+export type { GithubModRepository, GithubModSearchOptions, ModBrowseKind } from "./githubDiscovery";
