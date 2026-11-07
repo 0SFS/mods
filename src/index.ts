@@ -1,7 +1,8 @@
 export { assertManifest, dependencySource, inferExecution } from "./schema";
 export type {
-  ModAudioRendererContribution, ModAircraftContribution, ModDependencySpec, ModEngineContribution, ModExecutionMode, ModExternalTankDefinition,
+  BodyModData, BodyOrbitData, MissionCompleteWhen, MissionModData, MissionPhaseData, MissionStartData, ModAudioRendererContribution, ModAircraftContribution, ModDependencySpec, ModEngineContribution, ModExecutionMode, ModExternalTankDefinition,
   ModElectricEngineContribution, ModNativeEngineContribution, ElectricPropellerData, ModJsEntry, ModKind, ModPayloadContribution, ModProvenance, ModStoreDefinition, ModWasmEntry, OsfsModManifest,
+  SpaceEarthData, SpaceModData,
 } from "./schema";
 export { normalizeModSource } from "./normalizeModSource";
 export type { NormalizedModSource, NormalizeModSourceOptions } from "./normalizeModSource";

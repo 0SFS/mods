@@ -40,6 +40,8 @@ const BROWSE: readonly { id: ModBrowseKind; label: string }[] = [
   { id: "component", label: "Components" },
   { id: "payload", label: "Payloads" },
   { id: "plugin", label: "Plugins" },
+  { id: "body", label: "Bodies" },
+  { id: "mission", label: "Missions" },
   { id: "modpack", label: "Modpacks" },
 ];
 

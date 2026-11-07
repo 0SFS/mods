@@ -44,16 +44,20 @@ function partFrom(record: LoadedModRecord, seen: Set<string>): ModAboutPart {
 }
 
 /**
- * Modpacks, aircraft and plugin mods are roots. What each depends on (aircraft,
- * engines, components, payload items) nests underneath. A dependency used twice
- * is expanded once and then shown as the same copy.
+ * Modpacks, aircraft, plugins, bodies and missions are roots. What each depends
+ * on nests underneath. A dependency used twice is expanded once and then shown
+ * as the same copy.
  */
+function isListedRoot(kind: string): boolean {
+  return kind === "modpack" || kind === "aircraft" || kind === "plugin" || kind === "body" || kind === "mission";
+}
+
 export function modAboutParts(records: readonly LoadedModRecord[]): ModAboutPart[] {
   const referenced = new Set<string>();
   for (const record of records) {
     for (const dependency of record.dependencies) referenced.add(dependency.source.canonicalKey);
   }
-  const roots = records.filter(record => !referenced.has(record.source.canonicalKey) || record.manifest.kind === "modpack" || record.manifest.kind === "aircraft" || record.manifest.kind === "plugin");
+  const roots = records.filter(record => !referenced.has(record.source.canonicalKey) || isListedRoot(record.manifest.kind));
   const uniqueRoots = roots.filter((record, index) => roots.findIndex(other => other.source.canonicalKey === record.source.canonicalKey) === index);
   const seen = new Set<string>();
   return uniqueRoots.map(record => partFrom(record, seen));

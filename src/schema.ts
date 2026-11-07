@@ -1,13 +1,17 @@
 /**
  * What a mod contributes. An aircraft, an engine, a component shared by other mods
- * (a propeller, a gimbal, a camera, a flight model), one payload item, or a plugin.
- * A modpack contributes nothing itself: it lists the mods to install together.
+ * (a propeller, a gimbal, a camera, a flight model), one payload item, a plugin,
+ * one celestial body, or one mission. A modpack contributes nothing itself: it
+ * lists the mods to install together.
  */
-export const MOD_KINDS = ["aircraft", "engine", "component", "payload", "plugin", "modpack"] as const;
+export const MOD_KINDS = ["aircraft", "engine", "component", "payload", "plugin", "body", "mission", "modpack"] as const;
 export type ModKind = (typeof MOD_KINDS)[number];
 
+/** The Kármán line. The atmospheric envelope stops here, and space flight begins here. */
+export const SPACE_DEPARTURE_ALTITUDE_M = 100_000;
+
 /** The keys that carry a mod's own content. A modpack has none of them. */
-const CONTENT_KEYS = ["aircraft", "engine", "payload", "jsbsimFiles", "quadcopter", "dji", "quad", "camera", "cameraPreview", "audioRenderer", "wasm", "js"] as const;
+const CONTENT_KEYS = ["aircraft", "engine", "payload", "jsbsimFiles", "quadcopter", "dji", "quad", "camera", "cameraPreview", "audioRenderer", "space", "body", "mission", "wasm", "js"] as const;
 
 /** Declarative mods run no code. Rust/WASM is the sandboxed path. JS is the last resort. */
 export type ModExecutionMode = "declarative" | "wasm" | "js";
@@ -55,6 +59,89 @@ export interface ModAudioRendererContribution {
 /** Optional live-view provider. Its JS module exports createCameraPreview. */
 export interface CameraPreviewModData {
   apiVersion: 1;
+}
+
+/** Earth, as the space plugin declares it. Other bodies are `body` mods. */
+export interface SpaceEarthData {
+  id: "earth";
+  gravitationalParameterM3S2: number;
+  equatorialRadiusM: number;
+  soiRadiusM: number;
+  rotationRadS: number;
+}
+
+/** Opt-in space flight. Present only on the `0sfs/space` plugin. */
+export interface SpaceModData {
+  apiVersion: 1;
+  originBodyId: "earth";
+  departureAltitudeM: number;
+  earth: SpaceEarthData;
+}
+
+/** Keplerian elements of a body that orbits Earth, in Earth-centered inertial axes. */
+export interface BodyOrbitData {
+  semiMajorAxisM: number;
+  eccentricity: number;
+  inclinationRad: number;
+  longitudeOfAscendingNodeRad: number;
+  argumentOfPeriapsisRad: number;
+  meanAnomalyAtEpochRad: number;
+  /** Seconds on the space session clock. The session starts this clock at zero when space is installed. */
+  epochSeconds: number;
+}
+
+/**
+ * One celestial body other than Earth. Its orbit is around Earth.
+ * `rotationRadS` is spin about the orbit normal relative to the meridian that
+ * faces Earth: zero keeps longitude 0 aimed at Earth.
+ */
+export interface BodyModData {
+  apiVersion: 1;
+  id: string;
+  name: string;
+  gravitationalParameterM3S2: number;
+  equatorialRadiusM: number;
+  soiRadiusM: number;
+  rotationRadS: number;
+  parentBodyId: "earth";
+  orbit: BodyOrbitData;
+}
+
+export type MissionCompleteWhen =
+  | { kind: "altitude-below"; altMeters: number }
+  | { kind: "altitude-above"; altMeters: number }
+  | { kind: "speed-below"; speedMps: number }
+  | { kind: "body"; bodyId: string };
+
+export interface MissionPhaseData {
+  id: string;
+  label: string;
+  completeWhen: MissionCompleteWhen;
+}
+
+/** A start on a body's surface frame. Altitude is metres above that body's radius. */
+export interface MissionStartData {
+  frame: "body-fixed";
+  bodyId: string;
+  latDeg: number;
+  lonDeg: number;
+  altMeters: number;
+  headingDeg: number;
+  northMps: number;
+  eastMps: number;
+  upMps: number;
+}
+
+/** One scenario. It runs only after the space plugin and the bodies it names are installed. */
+export interface MissionModData {
+  apiVersion: 1;
+  id: string;
+  name: string;
+  summary: string;
+  bodyId: string;
+  requiredBodyIds: readonly string[];
+  start: MissionStartData;
+  phases: readonly MissionPhaseData[];
 }
 
 export interface ElectricPropellerData {
@@ -250,11 +337,98 @@ export interface OsfsModManifest {
   quad?: QuadVehicleModData;
   camera?: DroneCameraModData;
   cameraPreview?: CameraPreviewModData;
+  /** Present on the opt-in space plugin. Absent from the default modpack. */
+  space?: SpaceModData;
+  /** Present on a `body` mod. */
+  body?: BodyModData;
+  /** Present on a `mission` mod. */
+  mission?: MissionModData;
   audioRenderer?: ModAudioRendererContribution;
   engine?: ModEngineContribution;
   payload?: ModPayloadContribution;
   wasm?: ModWasmEntry;
   js?: ModJsEntry;
+}
+
+const IDENT = /^[a-z][a-z0-9-]{0,63}$/;
+
+function ident(value: unknown): value is string {
+  return typeof value === "string" && IDENT.test(value);
+}
+
+function finiteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function assertSpace(space: SpaceModData | undefined, id: string, kind: ModKind | undefined, execution: ModExecutionMode): void {
+  if (kind !== "plugin" || execution !== "declarative") {
+    throw new Error(`Space mod ${id} must be a declarative plugin.`);
+  }
+  if (!space || space.apiVersion !== 1 || space.originBodyId !== "earth" || space.departureAltitudeM !== SPACE_DEPARTURE_ALTITUDE_M) {
+    throw new Error(`Space mod ${id} needs apiVersion 1, origin earth, and departure ${SPACE_DEPARTURE_ALTITUDE_M} m.`);
+  }
+  const earth = space.earth;
+  if (!earth || earth.id !== "earth" || !finiteNumber(earth.gravitationalParameterM3S2) || earth.gravitationalParameterM3S2 <= 0
+    || !finiteNumber(earth.equatorialRadiusM) || earth.equatorialRadiusM <= 0
+    || !finiteNumber(earth.soiRadiusM) || earth.soiRadiusM <= earth.equatorialRadiusM
+    || !finiteNumber(earth.rotationRadS) || earth.rotationRadS <= 0) {
+    throw new Error(`Space mod ${id} needs Earth's gravitational parameter, radius, sphere of influence, and rotation.`);
+  }
+}
+
+function assertBody(body: BodyModData | undefined, id: string, kind: ModKind | undefined, execution: ModExecutionMode): void {
+  if (kind !== "body" || execution !== "declarative") throw new Error(`Body mod ${id} must be a declarative body.`);
+  const orbit = body?.orbit;
+  if (!body || body.apiVersion !== 1 || !ident(body.id) || body.id === "earth" || typeof body.name !== "string" || !body.name
+    || body.parentBodyId !== "earth"
+    || !finiteNumber(body.gravitationalParameterM3S2) || body.gravitationalParameterM3S2 <= 0
+    || !finiteNumber(body.equatorialRadiusM) || body.equatorialRadiusM <= 0
+    || !finiteNumber(body.soiRadiusM) || body.soiRadiusM <= body.equatorialRadiusM
+    || !finiteNumber(body.rotationRadS)) {
+    throw new Error(`Body mod ${id} needs a name, an id other than earth, a radius, a sphere of influence, and an Earth orbit.`);
+  }
+  if (!orbit || !finiteNumber(orbit.semiMajorAxisM) || orbit.semiMajorAxisM <= 0
+    || !finiteNumber(orbit.eccentricity) || orbit.eccentricity < 0 || orbit.eccentricity >= 1
+    || !finiteNumber(orbit.inclinationRad) || orbit.inclinationRad < 0 || orbit.inclinationRad > Math.PI
+    || !finiteNumber(orbit.longitudeOfAscendingNodeRad) || !finiteNumber(orbit.argumentOfPeriapsisRad)
+    || !finiteNumber(orbit.meanAnomalyAtEpochRad) || !finiteNumber(orbit.epochSeconds)) {
+    throw new Error(`Body mod ${id} needs a bound elliptical orbit around Earth.`);
+  }
+}
+
+function assertCompleteWhen(value: MissionCompleteWhen | undefined, label: string): void {
+  if (!value) throw new Error(`${label} needs a completion.`);
+  if ((value.kind === "altitude-below" || value.kind === "altitude-above") && finiteNumber(value.altMeters)) return;
+  if (value.kind === "speed-below" && finiteNumber(value.speedMps) && value.speedMps >= 0) return;
+  if (value.kind === "body" && ident(value.bodyId)) return;
+  throw new Error(`${label} has an unknown completion.`);
+}
+
+function assertMission(mission: MissionModData | undefined, id: string, kind: ModKind | undefined, execution: ModExecutionMode): void {
+  if (kind !== "mission" || execution !== "declarative") throw new Error(`Mission mod ${id} must be a declarative mission.`);
+  const start = mission?.start;
+  if (!mission || mission.apiVersion !== 1 || !ident(mission.id) || typeof mission.name !== "string" || !mission.name
+    || typeof mission.summary !== "string" || !mission.summary || !ident(mission.bodyId)
+    || !Array.isArray(mission.requiredBodyIds) || !mission.requiredBodyIds.every(ident)
+    || (mission.bodyId !== "earth" && !mission.requiredBodyIds.includes(mission.bodyId))
+    || !mission.phases?.length) {
+    throw new Error(`Mission mod ${id} needs a name, a body, the bodies it requires, and at least one phase.`);
+  }
+  if (!start || start.frame !== "body-fixed" || start.bodyId !== mission.bodyId
+    || !finiteNumber(start.latDeg) || Math.abs(start.latDeg) > 90
+    || !finiteNumber(start.lonDeg) || Math.abs(start.lonDeg) > 180
+    || !finiteNumber(start.altMeters) || !finiteNumber(start.headingDeg)
+    || !finiteNumber(start.northMps) || !finiteNumber(start.eastMps) || !finiteNumber(start.upMps)) {
+    throw new Error(`Mission mod ${id} needs a body-fixed start on its own body.`);
+  }
+  const seen = new Set<string>();
+  for (const phase of mission.phases) {
+    if (!phase || !ident(phase.id) || seen.has(phase.id) || typeof phase.label !== "string" || !phase.label) {
+      throw new Error(`Mission mod ${id} has a phase without a unique id and label.`);
+    }
+    seen.add(phase.id);
+    assertCompleteWhen(phase.completeWhen, `Mission mod ${id} phase ${phase.id}`);
+  }
 }
 
 export function dependencySource(dependency: string | ModDependencySpec): string {
@@ -333,6 +507,12 @@ export function assertManifest(value: unknown): OsfsModManifest {
       || !entry.split(/[?#]/)[0] || entry.split(/[?#]/)[0]!.endsWith("/")) {
       throw new Error(`Camera preview mod ${manifest.id} needs js.path relative to its mod directory.`);
     }
+  }
+  if (manifest.space !== undefined) assertSpace(manifest.space, manifest.id, manifest.kind, execution);
+  if (manifest.body !== undefined || manifest.kind === "body") assertBody(manifest.body, manifest.id, manifest.kind, execution);
+  if (manifest.mission !== undefined || manifest.kind === "mission") assertMission(manifest.mission, manifest.id, manifest.kind, execution);
+  if ((manifest.kind === "body" || manifest.kind === "mission") && !manifest.dependencies?.length) {
+    throw new Error(`Mod ${manifest.id} must depend on the space mod.`);
   }
   if (manifest.kind === "modpack") {
     if (!manifest.dependencies?.length) throw new Error(`Modpack ${manifest.id} lists no mods in dependencies.`);
