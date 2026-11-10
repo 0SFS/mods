@@ -48,6 +48,7 @@ describe("mod search panel", () => {
     await render(props);
     const input = host.querySelector<HTMLInputElement>('input[placeholder="{org}/{repo}"]')!;
     expect(input).not.toBeNull();
+    expect(host.textContent).toContain("A checkout that is not published yet uses This computer.");
     expect(button("Add mod").disabled).toBe(true);
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "camera");

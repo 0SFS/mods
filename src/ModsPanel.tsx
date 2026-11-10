@@ -87,12 +87,12 @@ export function ModsPanel(props: ModsPanelProps) {
             <span>{local ? "Repository on this computer" : "Search mods or enter a GitHub URL"}</span>
             <input value={props.source} onChange={(event) => props.onSource(event.target.value)} placeholder="{org}/{repo}" aria-label={local ? "Mod owner and repo on this computer" : "Search mods or enter a GitHub URL or owner/repo"} autoComplete="off" spellCheck={false} aria-controls={local ? undefined : "osfs-mods-results"} />
           </label>
-          {local ? <p className="flight-panel__hint">Loads that checkout from this dev server, including its dependencies.</p> : null}
+          {local ? <p className="flight-panel__hint">Loads that checkout from this dev server, including its dependencies.</p> : props.allowLocal ? <p className="flight-panel__hint">An owner/repo loads its published GitHub Pages site. A checkout that is not published yet uses This computer.</p> : null}
           <button className="flight-panel__command" type="submit" disabled={!canAdd}>Add mod</button>
           {props.notice ? <p className="flight-panel__hint is-error">{props.notice}</p> : null}
           <button type="button" className="osfs-mods__help" popoverTarget="osfs-mods-safety" aria-label="How mod safety works">?</button>
           <div id="osfs-mods-safety" popover="auto" className="osfs-mods__help-body">
-            <p>Search public repositories tagged 0sfs-mod, or enter a GitHub URL or owner/repo to add a mod directly. Added mods load their published copy.</p>
+            <p>Search public repositories tagged 0sfs-mod, or enter a GitHub URL or owner/repo to add a mod directly. Added mods load their published GitHub Pages copy. On a dev server, This computer loads a checkout that has no published manifest yet.</p>
             <p>Official 0SFS and foss-earth mods load directly. A repository you own loads directly once your GitHub username is set. Any other owner asks before it is enabled. Declarative mods are data only. Rust/WASM mods stay in a sandbox. JavaScript mods are unsandboxed and never start from a shared link.</p>
             <a href="https://github.com/0SFS/docs/blob/main/modding.md" target="_blank" rel="noreferrer">Modding guide</a>
           </div>
